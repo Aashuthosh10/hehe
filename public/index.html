@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clara - AI Character</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <h1>Clara</h1>
+                    <span class="subtitle">AI Receptionist</span>
+                </div>
+                <div class="header-actions">
+                    <a href="/college-demo" class="college-link" style="margin-right: 15px;">
+                        <i class="fas fa-graduation-cap"></i>
+                        College Demo
+                    </a>
+                    <a href="/staff" class="staff-link" style="margin-right: 15px;">
+                        <i class="fas fa-user-tie"></i>
+                        Staff Login
+                    </a>
+                    <button class="video-call-btn" onclick="showVideoCall()" style="margin-right: 15px;">
+                        <i class="fas fa-video"></i>
+                        Video Call
+                    </button>
+                    <div class="status-indicator">
+                        <div class="status-dot" id="statusDot"></div>
+                        <span id="statusText">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <main class="chat-container">
+            <div class="chat-messages" id="chatMessages" role="log" aria-live="polite">
+                <!-- Welcome message -->
+                <div class="message bot-message" role="article">
+                    <div class="message-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="message-content">
+                                                 <div class="message-text">
+                             Hi there! I'm Clara, your friendly AI receptionist! 😊 I'm so excited to help you today! Feel free to ask me anything - I'm here to assist you with whatever you need!
+                         </div>
+                        <div class="message-time" id="welcomeTime"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speech Input Area -->
+            <div class="chat-input-container">
+                <div class="speech-input-group">
+                    <button 
+                        type="button" 
+                        class="speech-input-button" 
+                        id="speechInputButton"
+                        aria-label="Click to speak"
+                        title="Click to speak"
+                    >
+                        <i class="fas fa-microphone" id="micIcon"></i>
+                    </button>
+                    <div class="speech-status-display" id="speechStatusDisplay">
+                        Click the microphone to speak
+                    </div>
+                </div>
+                
+                <!-- Speech Output Controls -->
+                <div class="speech-controls">
+                    <button 
+                        class="speech-button" 
+                        id="speechToggle"
+                        aria-label="Toggle speech synthesis"
+                        title="Toggle speech synthesis"
+                    >
+                        <i class="fas fa-volume-up" id="speechIcon"></i>
+                    </button>
+                    <span class="speech-status" id="speechStatus">Clara voice enabled</span>
+                    
+                    <!-- Text Cleaning Toggle -->
+                    <button 
+                        class="speech-button text-cleaning-toggle" 
+                        id="textCleaningToggle"
+                        aria-label="Toggle text cleaning for speech"
+                        title="Toggle text cleaning (remove emojis and special characters)"
+                    >
+                        <i class="fas fa-magic" id="textCleaningIcon"></i>
+                    </button>
+                    <span class="speech-status" id="textCleaningStatus">Text cleaning enabled</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Video Call Interface (Hidden by default) -->
+        <div class="video-call-interface" id="videoCallInterface" style="display: none;">
+            <div class="video-call-header">
+                <h2>📹 Video Call with Staff</h2>
+                <button class="close-video-call" onclick="hideVideoCall()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="video-container">
+                <div class="video-grid">
+                    <div class="video-item">
+                        <video id="localVideo" autoplay muted playsinline></video>
+                        <div class="video-label">You</div>
+                    </div>
+                    <div class="video-item">
+                        <video id="remoteVideo" autoplay playsinline></video>
+                        <div class="video-label">Staff Member</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="video-controls">
+                <button class="control-btn" id="muteBtn" onclick="toggleMute()">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="control-btn" id="videoBtn" onclick="toggleVideo()">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button class="control-btn end-call" onclick="endCall()">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Enhanced Error Modal -->
+        <div class="error-modal" id="errorModal" style="display: none;">
+            <div class="error-content">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3 class="error-title">Error</h3>
+                <p class="error-message" id="errorMessage">An error occurred. Please try again.</p>
+                <button id="closeError" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

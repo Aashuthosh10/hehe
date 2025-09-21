@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Interface - Sai Vidya Institute</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Exact match to image */
+        .sidebar {
+            width: 280px;
+            background: #1a1a2e;
+            border-right: 1px solid #16213e;
+            padding: 2rem 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid #16213e;
+            margin-bottom: 2rem;
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #ef4444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .profile-info h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: white;
+        }
+
+        .profile-info p {
+            color: #94a3b8;
+            font-size: 0.875rem;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 0 1rem;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .nav-link.active {
+            background: #22d3ee;
+            color: #0f172a;
+        }
+
+        .nav-link i {
+            font-size: 1.125rem;
+            width: 20px;
+        }
+
+        /* Main Content - Exact match to image */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: #0f172a;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #16213e;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-secondary {
+            background: rgba(148, 163, 184, 0.1);
+            color: #cbd5e1;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(148, 163, 184, 0.2);
+        }
+
+        /* Grid Layout - Exact 2x2 from image */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: #22d3ee;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #16213e;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            margin: 0;
+        }
+
+        .card-content {
+            color: #cbd5e1;
+            line-height: 1.6;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Login Overlay */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-card {
+            background: #1a1a2e;
+            border: 1px solid #16213e;
+            border-radius: 1.5rem;
+            padding: 3rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h2 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: white;
+        }
+
+        .login-header p {
+            color: #94a3b8;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #e2e8f0;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1px solid #16213e;
+            border-radius: 0.75rem;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #64748b;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2563eb;
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* Call Updates Specific Styles */
+        .call-updates {
+            min-height: 300px;
+        }
+
+        .call-updates .card-content {
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Overlay -->
+        <div id="loginOverlay" class="login-overlay">
+            <div class="login-card">
+                <div class="login-header">
+                    <h2>Staff Login</h2>
+                    <p>Enter your credentials to access the dashboard</p>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" placeholder="Enter your email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                </form>
+                <div class="credentials-list" style="margin-top: 20px; padding: 15px; background: #0f172a; border: 1px solid #16213e; border-radius: 8px;">
+                    <h4 style="color: #22d3ee; margin-bottom: 10px;">Demo Credentials:</h4>
+                    <div class="credential-item" style="padding: 5px 0; border-bottom: 1px solid #16213e; color: #94a3b8;">Email: anithacs@gmail.com | Password: demo123</div>
+                    <div class="credential-item" style="padding: 5px 0; border-bottom: 1px solid #16213e; color: #94a3b8;">Email: lakshmidurga@gmail.com | Password: demo123</div>
+                    <div class="credential-item" style="padding: 5px 0; color: #94a3b8;">Email: gdhivyasri@gmail.com | Password: demo123</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="profile">
+                    <div class="profile-avatar" id="profileAvatar">PS</div>
+                    <div class="profile-info">
+                        <h2 id="profileName">Prof. Anitha C S</h2>
+                        <p id="profileDept">Computer Science</p>
+                        <p id="profileBranch">Engineering</p>
+                    </div>
+                </div>
+            </div>
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" data-tab="profile">
+                            <i class="fas fa-user"></i>
+                            Profile
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-tab="settings">
+                            <i class="fas fa-cog"></i>
+                            Settings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-tab="team">
+                            <i class="fas fa-users"></i>
+                            Team Directory
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-tab="tasks">
+                            <i class="fas fa-tasks"></i>
+                            Task Management
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-tab="leave">
+                            <i class="fas fa-calendar-times"></i>
+                            Leave Requests
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-tab="resources">
+                            <i class="fas fa-folder"></i>
+                            Resources
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h1>Staff Dashboard</h1>
+                <div class="header-actions">
+                    <div class="status-badge" id="connectionStatus">Connected</div>
+                    <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid - Exact 2x2 layout from image -->
+            <div class="dashboard-grid">
+                <!-- Weekly Timetable -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #3b82f6;">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                        <h2 class="card-title">Weekly Timetable</h2>
+                    </div>
+                    <div class="card-content">
+                        <p>No timetable yet</p>
+                    </div>
+                </div>
+
+                <!-- Call Updates -->
+                <div class="card call-updates">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #48bb78;">
+                            <i class="fas fa-phone"></i>
+                        </div>
+                        <h2 class="card-title">Call Updates</h2>
+                    </div>
+                    <div id="callUpdatesContainer" class="card-content">
+                        <!-- Call Updates Container will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Call Log -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #f59e0b;">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <h2 class="card-title">Call Log</h2>
+                    </div>
+                    <div class="card-content">
+                        <p>Login to view call log</p>
+                    </div>
+                </div>
+
+                <!-- Appointments -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: #8b5cf6;">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <h2 class="card-title">Appointments</h2>
+                    </div>
+                    <div class="card-content">
+                        <p>No appointments scheduled</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Font Awesome -->
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+
+    <script>
+        // Global variables
+        let currentStaff = null;
+        let socket = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            setupEventListeners();
+            checkAuthStatus();
+        });
+
+        // Socket initialization
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                updateConnectionStatus('Connected', 'connected');
+            });
+
+            socket.on('disconnect', () => {
+                updateConnectionStatus('Disconnected', 'disconnected');
+            });
+
+            // Call event listeners
+            socket.on('call_initiated', (data) => {
+                console.log('Call initiated:', data);
+            });
+
+            socket.on('call_accepted', (data) => {
+                console.log('Call accepted:', data);
+            });
+
+            socket.on('call_declined', (data) => {
+                console.log('Call declined:', data);
+            });
+
+            socket.on('call_ended', (data) => {
+                console.log('Call ended:', data);
+            });
+        }
+
+        // Event listeners
+        function setupEventListeners() {
+            // Login form
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+            
+            // Tab navigation
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    switchTab(link.dataset.tab);
+                });
+            });
+        }
+
+        // Authentication
+        function checkAuthStatus() {
+            const token = localStorage.getItem('staffToken');
+            if (token) {
+                // Verify token and get staff info
+                fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentStaff = data.staff;
+                        onStaffLoginSuccess();
+                    } else {
+                        showLoginOverlay();
+                    }
+                })
+                .catch(() => {
+                    showLoginOverlay();
+                });
+            } else {
+                showLoginOverlay();
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Demo authentication
+            const demoStaff = {
+                'anithacs@gmail.com': { id: 'ACS', name: 'Prof. Anitha C S', dept: 'Computer Science', branch: 'Engineering', avatar: 'PS' },
+                'lakshmidurga@gmail.com': { id: 'LDN', name: 'Prof. Lakshmi Durga N', dept: 'Computer Science', branch: 'Engineering', avatar: 'LD' },
+                'gdhivyasri@gmail.com': { id: 'GD', name: 'Dr. G Dhivyasri', dept: 'Computer Science', branch: 'Engineering', avatar: 'GD' }
+            };
+
+            if (password === 'demo123' && demoStaff[email]) {
+                currentStaff = demoStaff[email];
+                localStorage.setItem('staffToken', 'demo-token-' + Date.now());
+                // Register this staff connection with the server so call routing works
+                try {
+                    if (socket && socket.connected) {
+                        socket.emit('staff-login', { email, password });
+                    }
+                } catch (_) {}
+                onStaffLoginSuccess();
+            } else {
+                alert('Invalid credentials. Please use the demo credentials provided.');
+            }
+        }
+
+        function onStaffLoginSuccess() {
+            hideLoginOverlay();
+            updateProfileInfo();
+            initializeCallUpdatesContainer();
+        }
+
+        function handleLogout() {
+            currentStaff = null;
+            localStorage.removeItem('staffToken');
+            showLoginOverlay();
+        }
+
+        function showLoginOverlay() {
+            document.getElementById('loginOverlay').style.display = 'flex';
+        }
+
+        function hideLoginOverlay() {
+            document.getElementById('loginOverlay').style.display = 'none';
+        }
+
+        function updateProfileInfo() {
+            if (currentStaff) {
+                document.getElementById('profileName').textContent = currentStaff.name;
+                document.getElementById('profileDept').textContent = currentStaff.dept;
+                document.getElementById('profileBranch').textContent = currentStaff.branch;
+                document.getElementById('profileAvatar').textContent = currentStaff.avatar;
+            }
+        }
+
+        function updateConnectionStatus(status, type) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status-badge ${type}`;
+        }
+
+        function switchTab(tabName) {
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Add active class to clicked link
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            
+            // Here you would typically show/hide different content sections
+            console.log('Switched to tab:', tabName);
+        }
+
+        // Call Updates Container
+        function initializeCallUpdatesContainer() {
+            if (!currentStaff) return;
+
+            const container = document.getElementById('callUpdatesContainer');
+            if (!container) return;
+
+            // Get JWT token from localStorage
+            const jwtToken = localStorage.getItem('staffToken') || 'demo-token';
+
+            // Render CallUpdatesWidget component
+            const callUpdatesElement = React.createElement(CallUpdatesWidget, {
+                staffId: currentStaff.id,
+                jwtToken: jwtToken
+            });
+
+            ReactDOM.render(callUpdatesElement, container);
+        }
+    </script>
+
+    <!-- Component Scripts -->
+    <script src="/utils/socket.js"></script>
+    <script src="/hooks/useWebRTC.js"></script>
+    <script src="/components/CallUpdatesWidget.jsx"></script>
+    <script src="/components/CallUpdates.jsx"></script>
+    <script src="/components/CallUpdatesContainer.js"></script>
+    <script src="/components/SessionWebRTCManager.js"></script>
+    <script src="/components/SessionManager.js"></script>
+    <script src="/components/SessionCallNotification.js"></script>
+    <script src="/components/SessionVideoCall.js"></script>
+</body>
+</html>
