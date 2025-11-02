@@ -862,14 +862,41 @@ Troubleshooting:
     }
 
     setupDebugPanel() {
-        // Only show debug panel on iOS devices (where Web Inspector isn't easily accessible)
-        if (!this.browserInfo.isIOS) return;
+        // Show debug panel on mobile devices (iOS/Android) where Web Inspector isn't easily accessible
+        // Also add fallback check in case browser detection fails
+        const isMobileDevice = this.browserInfo.isMobile || 
+                              /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
+                              (window.innerWidth < 768); // Fallback: small screen = likely mobile
+        
+        if (!isMobileDevice) {
+            console.log('Debug panel: Not showing (desktop device)');
+            return;
+        }
+        
+        // Ensure body is ready before creating panel
+        if (!document.body) {
+            setTimeout(() => this.setupDebugPanel(), 100);
+            return;
+        }
+        
+        // Check if already exists
+        if (document.getElementById('debugToggleBtn')) {
+            console.log('Debug panel: Already exists');
+            return;
+        }
+        
+        console.log('Debug panel: Initializing for mobile device', {
+            isIOS: this.browserInfo.isIOS,
+            isMobile: this.browserInfo.isMobile,
+            userAgent: navigator.userAgent.substring(0, 50),
+            screenWidth: window.innerWidth
+        });
         
         // Create debug panel HTML
         const debugPanelHTML = `
             <div id="iosDebugPanel" style="display: none; position: fixed; bottom: 10px; right: 10px; width: 90%; max-width: 400px; max-height: 300px; background: rgba(0, 0, 0, 0.9); color: #fff; border-radius: 10px; padding: 15px; z-index: 10000; font-family: monospace; font-size: 11px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 8px;">
-                    <strong style="color: #ffa500;">🐛 iOS Debug Panel</strong>
+                    <strong style="color: #ffa500;">🐛 Mobile Debug Panel</strong>
                     <div>
                         <button id="debugClearBtn" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; margin-right: 5px; font-size: 10px; cursor: pointer;">Clear</button>
                         <button id="debugCloseBtn" style="background: #666; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">✕</button>
@@ -882,93 +909,106 @@ Troubleshooting:
             </button>
         `;
         
-        document.body.insertAdjacentHTML('beforeend', debugPanelHTML);
-        
-        const debugPanel = document.getElementById('iosDebugPanel');
-        const debugLogs = document.getElementById('debugLogs');
-        const debugToggleBtn = document.getElementById('debugToggleBtn');
-        const debugCloseBtn = document.getElementById('debugCloseBtn');
-        const debugClearBtn = document.getElementById('debugClearBtn');
-        
-        // Toggle panel
-        debugToggleBtn.addEventListener('click', () => {
-            debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
-        });
-        
-        debugCloseBtn.addEventListener('click', () => {
-            debugPanel.style.display = 'none';
-        });
-        
-        debugClearBtn.addEventListener('click', () => {
-            debugLogs.innerHTML = '';
-        });
-        
-        // Intercept console methods to show in panel
-        const originalLog = console.log;
-        const originalWarn = console.warn;
-        const originalError = console.error;
-        
-        const addLog = (message, type = 'log') => {
-            const timestamp = new Date().toLocaleTimeString();
-            const colors = {
-                log: '#0ea5e9',
-                warn: '#f59e0b',
-                error: '#ef4444'
-            };
-            const icons = {
-                log: 'ℹ️',
-                warn: '⚠️',
-                error: '❌'
-            };
+        try {
+            document.body.insertAdjacentHTML('beforeend', debugPanelHTML);
             
-            const logEntry = document.createElement('div');
-            logEntry.style.marginBottom = '6px';
-            logEntry.style.padding = '4px';
-            logEntry.style.borderLeft = `3px solid ${colors[type]}`;
-            logEntry.style.paddingLeft = '8px';
-            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> <span style="color: ${colors[type]};">${icons[type]} ${String(message)}</span>`;
+            const debugPanel = document.getElementById('iosDebugPanel');
+            const debugLogs = document.getElementById('debugLogs');
+            const debugToggleBtn = document.getElementById('debugToggleBtn');
+            const debugCloseBtn = document.getElementById('debugCloseBtn');
+            const debugClearBtn = document.getElementById('debugClearBtn');
             
-            debugLogs.appendChild(logEntry);
-            debugLogs.scrollTop = debugLogs.scrollHeight;
-            
-            // Keep only last 50 logs
-            while (debugLogs.children.length > 50) {
-                debugLogs.removeChild(debugLogs.firstChild);
+            if (!debugPanel || !debugLogs || !debugToggleBtn) {
+                console.error('Debug panel: Failed to create elements');
+                return;
             }
-        };
-        
-        console.log = (...args) => {
-            originalLog.apply(console, args);
-            addLog(args.join(' '), 'log');
-        };
-        
-        console.warn = (...args) => {
-            originalWarn.apply(console, args);
-            addLog(args.join(' '), 'warn');
-        };
-        
-        console.error = (...args) => {
-            originalError.apply(console, args);
-            addLog(args.join(' '), 'error');
-        };
-        
-        // Show initial debug info
-        setTimeout(() => {
-            console.log('🔍 iOS Debug Panel Initialized');
-            console.log(`Device: iOS (${this.browserInfo.isInAppBrowser ? 'In-App Browser' : 'Safari'})`);
-            console.log(`Speech Synthesis: ${this.speechSynthesis ? 'Available' : 'Not Available'}`);
-            console.log(`Voices Available: ${this.availableVoices?.length || 0}`);
-            console.log(`User Interacted: ${this.hasUserInteracted ? 'Yes' : 'No'}`);
             
-            if (this.speechSynthesis) {
-                const voices = this.speechSynthesis.getVoices() || [];
-                console.log(`Current Voices: ${voices.length}`);
-                if (voices.length > 0) {
-                    const voiceNames = voices.slice(0, 3).map(v => v.name).join(', ');
-                    console.log(`Sample Voices: ${voiceNames}${voices.length > 3 ? '...' : ''}`);
+            // Toggle panel
+            debugToggleBtn.addEventListener('click', () => {
+                debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            debugCloseBtn.addEventListener('click', () => {
+                debugPanel.style.display = 'none';
+            });
+            
+            debugClearBtn.addEventListener('click', () => {
+                debugLogs.innerHTML = '';
+            });
+            
+            // Intercept console methods to show in panel
+            const originalLog = console.log;
+            const originalWarn = console.warn;
+            const originalError = console.error;
+            
+            const addLog = (message, type = 'log') => {
+                const timestamp = new Date().toLocaleTimeString();
+                const colors = {
+                    log: '#0ea5e9',
+                    warn: '#f59e0b',
+                    error: '#ef4444'
+                };
+                const icons = {
+                    log: 'ℹ️',
+                    warn: '⚠️',
+                    error: '❌'
+                };
+                
+                const logEntry = document.createElement('div');
+                logEntry.style.marginBottom = '6px';
+                logEntry.style.padding = '4px';
+                logEntry.style.borderLeft = `3px solid ${colors[type]}`;
+                logEntry.style.paddingLeft = '8px';
+                logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> <span style="color: ${colors[type]};">${icons[type]} ${String(message)}</span>`;
+                
+                debugLogs.appendChild(logEntry);
+                debugLogs.scrollTop = debugLogs.scrollHeight;
+                
+                // Keep only last 50 logs
+                while (debugLogs.children.length > 50) {
+                    debugLogs.removeChild(debugLogs.firstChild);
                 }
-            }
-        }, 1000);
+            };
+            
+            console.log = (...args) => {
+                originalLog.apply(console, args);
+                addLog(args.join(' '), 'log');
+            };
+            
+            console.warn = (...args) => {
+                originalWarn.apply(console, args);
+                addLog(args.join(' '), 'warn');
+            };
+            
+            console.error = (...args) => {
+                originalError.apply(console, args);
+                addLog(args.join(' '), 'error');
+            };
+            
+            // Show initial debug info
+            setTimeout(() => {
+                console.log('🔍 Mobile Debug Panel Initialized');
+                console.log(`Device: ${this.browserInfo.isIOS ? 'iOS' : this.browserInfo.isAndroid ? 'Android' : 'Mobile'}`);
+                console.log(`Browser: ${this.browserInfo.isSafari ? 'Safari' : this.browserInfo.isChrome ? 'Chrome' : 'Other'}`);
+                console.log(`In-App Browser: ${this.browserInfo.isInAppBrowser ? 'Yes' : 'No'}`);
+                console.log(`Speech Synthesis: ${this.speechSynthesis ? 'Available' : 'Not Available'}`);
+                console.log(`Voices Available: ${this.availableVoices?.length || 0}`);
+                console.log(`User Interacted: ${this.hasUserInteracted ? 'Yes' : 'No'}`);
+                
+                if (this.speechSynthesis) {
+                    const voices = this.speechSynthesis.getVoices() || [];
+                    console.log(`Current Voices: ${voices.length}`);
+                    if (voices.length > 0) {
+                        const voiceNames = voices.slice(0, 3).map(v => v.name).join(', ');
+                        console.log(`Sample Voices: ${voiceNames}${voices.length > 3 ? '...' : ''}`);
+                    }
+                }
+            }, 1000);
+            
+            console.log('✅ Debug panel created successfully');
+        } catch (error) {
+            console.error('❌ Failed to setup debug panel:', error);
+        }
     }
 
     startConversation() {
