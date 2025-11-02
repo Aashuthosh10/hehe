@@ -41,6 +41,7 @@ class Clara {
         this.setupSocketListeners();
         this.setWelcomeTime();
         this.setupKeyboardShortcuts();
+        this.setupDebugPanel(); // iOS debugging helper
     }
 
     initializeElements() {
@@ -347,12 +348,13 @@ class Clara {
             utterance.onstart = () => {
                 hasStarted = true;
                 console.log('iOS: ✅ Speech synthesis STARTED successfully');
+                console.log('iOS: Text being spoken:', textToSpeak.substring(0, 100) + (textToSpeak.length > 100 ? '...' : ''));
                 playButton.innerHTML = '<i class="fas fa-volume-up"></i> Speaking...';
                 playButton.style.opacity = '0.7';
             };
             
             utterance.onend = () => {
-                console.log('iOS: ✅ Speech synthesis COMPLETED');
+                console.log('iOS: ✅ Speech synthesis COMPLETED successfully');
                 setTimeout(() => {
                     playButton.remove();
                 }, 500);
@@ -360,7 +362,14 @@ class Clara {
             
             utterance.onerror = (event) => {
                 hasErrored = true;
-                console.error('iOS: ❌ Speech synthesis ERROR:', event.error, event);
+                const errorDetails = {
+                    error: event.error,
+                    charIndex: event.charIndex,
+                    type: event.type,
+                    utterance: event.utterance?.text?.substring(0, 50)
+                };
+                console.error('iOS: ❌ Speech synthesis ERROR:', errorDetails);
+                console.error('iOS: Full error event:', event);
                 
                 // Show error feedback
                 playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
@@ -368,28 +377,45 @@ class Clara {
                 
                 // Try to provide helpful error message
                 let errorMsg = 'Audio playback failed. ';
+                let helpMsg = '';
                 switch (event.error) {
                     case 'not-allowed':
-                        errorMsg += 'Permission denied. Check Safari settings.';
+                        errorMsg += 'Permission denied.';
+                        helpMsg = 'Go to Settings → Safari → Microphone → Allow';
                         break;
                     case 'audio-busy':
-                        errorMsg += 'Audio system busy. Try again.';
+                        errorMsg += 'Audio system busy.';
+                        helpMsg = 'Another app may be using audio. Close other apps and try again.';
                         break;
                     case 'audio-hardware':
-                        errorMsg += 'Audio hardware issue. Check device volume.';
+                        errorMsg += 'Audio hardware issue.';
+                        helpMsg = 'Check: 1) Volume is up, 2) Not in silent mode, 3) Speakers/headphones working';
                         break;
                     case 'synthesis-failed':
-                        errorMsg += 'Synthesis failed. Your device may not support this.';
+                        errorMsg += 'Synthesis failed.';
+                        helpMsg = 'Your iOS version may not support speech synthesis. Try updating iOS.';
+                        break;
+                    case 'interrupted':
+                        errorMsg += 'Speech was interrupted.';
+                        helpMsg = 'This is usually normal if you clicked something else.';
+                        break;
+                    case 'canceled':
+                        errorMsg += 'Speech was canceled.';
+                        helpMsg = 'This is usually normal if you clicked something else.';
                         break;
                     default:
-                        errorMsg += `Error: ${event.error || 'Unknown'}. Check device volume and Safari settings.`;
+                        errorMsg += `Error: ${event.error || 'Unknown'}.`;
+                        helpMsg = 'Check: 1) Volume up, 2) Not silent mode, 3) Safari settings';
                 }
                 
+                console.warn('iOS: Help message:', helpMsg);
+                
                 setTimeout(() => {
-                    this.showError(errorMsg);
+                    this.showError(errorMsg + (helpMsg ? '\n\n' + helpMsg : ''));
                     playButton.innerHTML = '<i class="fas fa-volume-up"></i> Tap to hear';
                     playButton.style.background = '';
                     playButton.style.opacity = '1';
+                    playButton.disabled = false;
                 }, 2000);
             };
             
@@ -413,12 +439,29 @@ class Clara {
                 // Verify it actually started (iOS quirk - sometimes speak() doesn't work)
                 setTimeout(() => {
                     if (!hasStarted && !hasErrored) {
-                        console.warn('iOS: Speech did not start - possible iOS Safari bug');
+                        console.warn('iOS: ⚠️ Speech did not start after 1 second - possible iOS Safari bug');
+                        console.warn('iOS: speechSynthesis state:', {
+                            speaking: this.speechSynthesis.speaking,
+                            pending: this.speechSynthesis.pending,
+                            paused: this.speechSynthesis.paused,
+                            voicesAvailable: this.speechSynthesis.getVoices()?.length || 0
+                        });
+                        
                         playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not supported';
                         playButton.style.background = '#ffa500';
                         playButton.disabled = false;
                         
-                        this.showError('Speech synthesis may not be supported on this iOS version. Try updating Safari or using a different device.');
+                        const helpText = `Speech synthesis may not be supported on this iOS version.
+
+Troubleshooting:
+1. Check iOS version (iOS 14.5+ required)
+2. Update Safari to latest version
+3. Go to Settings → Safari → Clear Website Data
+4. Try a different device/browser
+5. Ensure device volume is up and not in silent mode`;
+
+                        this.showError(helpText);
+                        console.error('iOS: Speech synthesis not working - see error message above');
                     }
                 }, 1000);
                 
@@ -816,6 +859,116 @@ class Clara {
                 }
             }
         });
+    }
+
+    setupDebugPanel() {
+        // Only show debug panel on iOS devices (where Web Inspector isn't easily accessible)
+        if (!this.browserInfo.isIOS) return;
+        
+        // Create debug panel HTML
+        const debugPanelHTML = `
+            <div id="iosDebugPanel" style="display: none; position: fixed; bottom: 10px; right: 10px; width: 90%; max-width: 400px; max-height: 300px; background: rgba(0, 0, 0, 0.9); color: #fff; border-radius: 10px; padding: 15px; z-index: 10000; font-family: monospace; font-size: 11px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 8px;">
+                    <strong style="color: #ffa500;">🐛 iOS Debug Panel</strong>
+                    <div>
+                        <button id="debugClearBtn" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; margin-right: 5px; font-size: 10px; cursor: pointer;">Clear</button>
+                        <button id="debugCloseBtn" style="background: #666; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer;">✕</button>
+                    </div>
+                </div>
+                <div id="debugLogs" style="line-height: 1.4;"></div>
+            </div>
+            <button id="debugToggleBtn" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0, 0, 0, 0.7); color: #ffa500; border: none; padding: 8px 12px; border-radius: 20px; z-index: 9999; font-size: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                🐛 Debug
+            </button>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', debugPanelHTML);
+        
+        const debugPanel = document.getElementById('iosDebugPanel');
+        const debugLogs = document.getElementById('debugLogs');
+        const debugToggleBtn = document.getElementById('debugToggleBtn');
+        const debugCloseBtn = document.getElementById('debugCloseBtn');
+        const debugClearBtn = document.getElementById('debugClearBtn');
+        
+        // Toggle panel
+        debugToggleBtn.addEventListener('click', () => {
+            debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        debugCloseBtn.addEventListener('click', () => {
+            debugPanel.style.display = 'none';
+        });
+        
+        debugClearBtn.addEventListener('click', () => {
+            debugLogs.innerHTML = '';
+        });
+        
+        // Intercept console methods to show in panel
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        const addLog = (message, type = 'log') => {
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                log: '#0ea5e9',
+                warn: '#f59e0b',
+                error: '#ef4444'
+            };
+            const icons = {
+                log: 'ℹ️',
+                warn: '⚠️',
+                error: '❌'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '6px';
+            logEntry.style.padding = '4px';
+            logEntry.style.borderLeft = `3px solid ${colors[type]}`;
+            logEntry.style.paddingLeft = '8px';
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> <span style="color: ${colors[type]};">${icons[type]} ${String(message)}</span>`;
+            
+            debugLogs.appendChild(logEntry);
+            debugLogs.scrollTop = debugLogs.scrollHeight;
+            
+            // Keep only last 50 logs
+            while (debugLogs.children.length > 50) {
+                debugLogs.removeChild(debugLogs.firstChild);
+            }
+        };
+        
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'log');
+        };
+        
+        console.warn = (...args) => {
+            originalWarn.apply(console, args);
+            addLog(args.join(' '), 'warn');
+        };
+        
+        console.error = (...args) => {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+        
+        // Show initial debug info
+        setTimeout(() => {
+            console.log('🔍 iOS Debug Panel Initialized');
+            console.log(`Device: iOS (${this.browserInfo.isInAppBrowser ? 'In-App Browser' : 'Safari'})`);
+            console.log(`Speech Synthesis: ${this.speechSynthesis ? 'Available' : 'Not Available'}`);
+            console.log(`Voices Available: ${this.availableVoices?.length || 0}`);
+            console.log(`User Interacted: ${this.hasUserInteracted ? 'Yes' : 'No'}`);
+            
+            if (this.speechSynthesis) {
+                const voices = this.speechSynthesis.getVoices() || [];
+                console.log(`Current Voices: ${voices.length}`);
+                if (voices.length > 0) {
+                    const voiceNames = voices.slice(0, 3).map(v => v.name).join(', ');
+                    console.log(`Sample Voices: ${voiceNames}${voices.length > 3 ? '...' : ''}`);
+                }
+            }
+        }, 1000);
     }
 
     startConversation() {
