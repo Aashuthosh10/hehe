@@ -2130,7 +2130,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Start server (only if not in serverless environment like Vercel)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+if (!process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`🚀 Clara AI Reception System running on port ${PORT}`);
     console.log(`📱 Client Interface: http://localhost:${PORT}`);
