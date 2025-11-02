@@ -9,6 +9,7 @@ const socketIo = require('socket.io');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 require('dotenv').config();
 
 // Import models
@@ -35,7 +36,7 @@ const io = socketIo(server, {
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'frontend', 'public')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -482,25 +483,25 @@ function calculateEndTime(startTime, durationMinutes) {
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/client-interface.html');
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'client-interface.html'));
 });
 
 // Staff interface
 app.get('/staff', (req, res) => {
-  res.sendFile(__dirname + '/public/staff-interface.html');
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'staff-interface.html'));
 });
 
 // Legacy routes for backward compatibility
 app.get('/clara', (req, res) => {
-  res.sendFile(__dirname + '/public/client-interface.html');
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'client-interface.html'));
 });
 
 app.get('/staff-dashboard', (req, res) => {
-  res.sendFile(__dirname + '/public/staff-interface.html');
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'staff-interface.html'));
 });
 
 app.get('/staff-login', (req, res) => {
-  res.sendFile(__dirname + '/public/staff-interface.html');
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'staff-interface.html'));
 });
 
 // API Routes
