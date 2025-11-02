@@ -26,6 +26,8 @@ class Clara {
 		this.noSpeechRetries = 0;
 		// iOS audio fix - track user interaction
 		this.hasUserInteracted = false;
+		// iOS: Store last response for replay
+		this.lastBotResponse = null;
 		// Video call state
 		this.peerConnection = null;
 		this.localStream = null;
@@ -242,6 +244,73 @@ class Clara {
             `💡 For now, you can type your messages instead!`;
         this.showError(message, 'Browser Compatibility');
     }
+    
+    showIOSPlayButton(text) {
+        // Find the last bot message and add a play button
+        const messages = document.getElementById('chatMessages');
+        if (!messages || !messages.lastElementChild) return;
+        
+        const lastMessage = messages.lastElementChild;
+        if (!lastMessage.classList.contains('bot-message')) return;
+        
+        // Check if button already exists
+        if (lastMessage.querySelector('.ios-play-audio-btn')) return;
+        
+        const messageContent = lastMessage.querySelector('.message-content');
+        if (!messageContent) return;
+        
+        const playButton = document.createElement('button');
+        playButton.className = 'ios-play-audio-btn';
+        playButton.innerHTML = '<i class="fas fa-volume-up"></i> Tap to hear';
+        playButton.onclick = (e) => {
+            e.stopPropagation();
+            // iOS: Speech must be called directly from this user interaction
+            if (this.speechSynthesis && (text || this.lastBotResponse)) {
+                try {
+                    const textToSpeak = text || this.lastBotResponse;
+                    // Mark as interacted
+                    this.hasUserInteracted = true;
+                    
+                    // Cancel any existing speech
+                    this.speechSynthesis.cancel();
+                    
+                    // Create utterance
+                    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                    
+                    // Set voice properties
+                    const voices = this.availableVoices && this.availableVoices.length > 0
+                        ? this.availableVoices
+                        : (this.speechSynthesis.getVoices() || []);
+                    
+                    if (voices.length > 0) {
+                        const preferred = voices.find(v => /en(-|_)US/i.test(v.lang))
+                            || voices.find(v => /en(-|_)GB/i.test(v.lang))
+                            || voices.find(v => /en/i.test(v.lang))
+                            || voices[0];
+                        if (preferred) utterance.voice = preferred;
+                    }
+                    
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 0.85;
+                    utterance.lang = 'en-US';
+                    
+                    // Remove button immediately (before speaking)
+                    playButton.remove();
+                    
+                    // Speak directly from user interaction (synchronous)
+                    this.speechSynthesis.speak(utterance);
+                    
+                    console.log('iOS: Playing audio from user interaction');
+                } catch (error) {
+                    console.error('iOS: Failed to play audio:', error);
+                    this.showError('Unable to play audio. Please check your device volume and ensure it\'s not in silent mode.', 'Audio Error');
+                }
+            }
+        };
+        
+        messageContent.appendChild(playButton);
+    }
 
     initializeVoices() {
         if (!this.speechSynthesis) return;
@@ -290,13 +359,39 @@ class Clara {
             if (!this.hasUserInteracted) {
                 this.hasUserInteracted = true;
                 console.log('User interaction detected - audio enabled for iOS');
-                // Process any queued speech
+                
+                // iOS: Establish audio context immediately
+                if (this.browserInfo.isIOS && this.speechSynthesis) {
+                    try {
+                        const unlockUtterance = new SpeechSynthesisUtterance('');
+                        unlockUtterance.volume = 0.01;
+                        unlockUtterance.onerror = () => {};
+                        this.speechSynthesis.speak(unlockUtterance);
+                        setTimeout(() => this.speechSynthesis.cancel(), 10);
+                        console.log('iOS: Audio context unlocked');
+                    } catch (e) {
+                        console.warn('iOS: Audio unlock failed:', e);
+                    }
+                }
+                
+                // Process any queued speech - call immediately while in interaction context
                 if (this.pendingSpeakQueue.length > 0 && this.isSpeechEnabled) {
                     const queued = [...this.pendingSpeakQueue];
                     this.pendingSpeakQueue = [];
-                    setTimeout(() => {
-                        queued.forEach(text => this.speak(text));
-                    }, 100);
+                    // On iOS, must call synchronously, not in setTimeout
+                    if (this.browserInfo.isIOS) {
+                        queued.forEach(text => {
+                            try {
+                                this.speak(text);
+                            } catch (e) {
+                                console.error('iOS: Failed to speak queued text:', e);
+                            }
+                        });
+                    } else {
+                        setTimeout(() => {
+                            queued.forEach(text => this.speak(text));
+                        }, 100);
+                    }
                 }
             }
         };
@@ -486,8 +581,25 @@ class Clara {
             this.hideTypingIndicator();
             this.addMessage(data.response, 'bot');
             
+            // Store last response for iOS replay
+            this.lastBotResponse = data.response;
+            
             if (this.isSpeechEnabled) {
-                this.speak(data.response);
+                // iOS: Socket.IO responses come outside user interaction window
+                // Always show play button for iOS as fallback
+                if (this.browserInfo.isIOS) {
+                    // Show play button - user can tap to hear
+                    this.showIOSPlayButton(data.response);
+                    // Also try auto-play (might work if audio context still valid)
+                    try {
+                        this.speak(data.response);
+                    } catch (e) {
+                        console.log('iOS: Auto-play failed (expected), user can tap play button');
+                    }
+                } else {
+                    // Non-iOS: works normally
+                    this.speak(data.response);
+                }
             }
             
             this.updateStatus('Ready', 'ready');
@@ -933,6 +1045,25 @@ class Clara {
 
     sendMessage(message) {
         if (!message.trim() || !this.isConversationStarted) return;
+        
+        // iOS Safari audio fix: Establish audio context immediately from user interaction
+        // This MUST be called synchronously during the user's click/tap event
+        if (this.browserInfo.isIOS && this.isSpeechEnabled && this.speechSynthesis) {
+            // Call speechSynthesis during user interaction to unlock audio
+            // Use minimal utterance to establish context
+            try {
+                const unlockUtterance = new SpeechSynthesisUtterance('');
+                unlockUtterance.volume = 0.01; // Almost silent
+                unlockUtterance.onerror = () => {}; // Ignore errors
+                this.speechSynthesis.speak(unlockUtterance);
+                // Immediately cancel to keep it silent
+                setTimeout(() => this.speechSynthesis.cancel(), 10);
+                this.hasUserInteracted = true; // Mark as interacted
+                console.log('iOS: Audio context established from user interaction');
+            } catch (e) {
+                console.warn('iOS: Failed to establish audio context:', e);
+            }
+        }
         
         // Add user message to chat
         this.addMessage(message, 'user');

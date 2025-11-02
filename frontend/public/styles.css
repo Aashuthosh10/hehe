@@ -229,6 +229,37 @@ body {
     margin-left: auto;
 }
 
+/* iOS Play Audio Button */
+.ios-play-audio-btn {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ios-play-audio-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.ios-play-audio-btn:active {
+    transform: translateY(0);
+}
+
+.ios-play-audio-btn i {
+    font-size: 0.875rem;
+}
+
 .message-time {
     font-size: 0.75rem;
     color: var(--text-secondary);
