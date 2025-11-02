@@ -61,9 +61,51 @@ class Clara {
         this.errorTitle = document.getElementById('errorTitle');
         this.errorMessage = document.getElementById('errorMessage');
         this.closeError = document.getElementById('closeError');
+        
+        // Browser detection
+        this.browserInfo = this.detectBrowser();
+    }
+    
+    detectBrowser() {
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        const isAndroid = /android/i.test(ua);
+        const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+        const isChrome = /chrome/i.test(ua) && !/edge/i.test(ua);
+        const isFirefox = /firefox/i.test(ua);
+        const isEdge = /edge/i.test(ua);
+        
+        // Detect in-app browsers
+        const isInAppBrowser = 
+            ua.includes('FBAN') || // Facebook in-app
+            ua.includes('FBAV') || // Facebook in-app
+            ua.includes('Instagram') || // Instagram in-app
+            ua.includes('WhatsApp') || // WhatsApp in-app
+            ua.includes('wv') || // Android WebView
+            (isIOS && window.navigator.standalone === undefined && window.navigator.standalone !== true); // iOS in-app
+        
+        return {
+            isIOS,
+            isAndroid,
+            isSafari,
+            isChrome,
+            isFirefox,
+            isEdge,
+            isInAppBrowser,
+            isMobile: isIOS || isAndroid
+        };
     }
 
     initializeSpeechRecognition() {
+        // Check if we're in an unsupported browser environment
+        if (this.browserInfo.isInAppBrowser) {
+            const appName = this.getInAppBrowserName();
+            this.speechInputButton.style.display = 'none';
+            this.speechStatusDisplay.textContent = `Microphone not available in ${appName}`;
+            this.showBrowserWarning(appName);
+            return;
+        }
+        
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.speechRecognition = new SpeechRecognition();
@@ -120,7 +162,11 @@ class Clara {
                         
                     case 'not-allowed':
                     case 'service-not-allowed':
-                        this.showError('Microphone permission denied. Please allow microphone access in your browser settings and refresh the page.');
+                        if (this.browserInfo.isIOS) {
+                            this.showIOSMicrophoneError();
+                        } else {
+                            this.showError('Microphone permission denied. Please allow microphone access in your browser settings and refresh the page.');
+                        }
                         break;
                         
                     case 'network':
@@ -148,8 +194,51 @@ class Clara {
             console.warn('Speech recognition not supported');
             this.speechInputButton.style.display = 'none';
             this.speechStatusDisplay.textContent = 'Speech recognition not supported in this browser';
-            this.showError('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari for the best experience.');
+            if (this.browserInfo.isIOS) {
+                this.showIOSBrowserError();
+            } else {
+                this.showError('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari for the best experience.');
+            }
         }
+    }
+    
+    getInAppBrowserName() {
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        if (ua.includes('WhatsApp')) return 'WhatsApp browser';
+        if (ua.includes('FBAN') || ua.includes('FBAV')) return 'Facebook browser';
+        if (ua.includes('Instagram')) return 'Instagram browser';
+        if (ua.includes('wv')) return 'in-app browser';
+        return 'this in-app browser';
+    }
+    
+    showBrowserWarning(appName) {
+        const message = `Microphone is not available in ${appName}.\n\n` +
+            `📱 To use voice input:\n\n` +
+            `1. Open Safari on your iPhone\n` +
+            `2. Go to: clara-ai-reception.onrender.com\n` +
+            `3. Allow microphone permission when asked\n\n` +
+            `💡 Tip: You can also type your messages instead!`;
+        this.showError(message, 'Browser Not Supported');
+    }
+    
+    showIOSMicrophoneError() {
+        const message = `Microphone permission is required for voice input.\n\n` +
+            `📱 To fix this on iPhone:\n\n` +
+            `1. Open iPhone Settings\n` +
+            `2. Go to Safari → Website Settings\n` +
+            `3. Find this website and allow Microphone\n` +
+            `4. Or refresh the page and tap "Allow" when prompted\n\n` +
+            `💡 You can also use text input by typing your messages!`;
+        this.showError(message, 'Microphone Permission Needed');
+    }
+    
+    showIOSBrowserError() {
+        const message = `Speech recognition works best in Safari on iPhone.\n\n` +
+            `📱 Recommended:\n` +
+            `• Use Safari browser (built-in iPhone browser)\n` +
+            `• Or use Chrome from App Store\n\n` +
+            `💡 For now, you can type your messages instead!`;
+        this.showError(message, 'Browser Compatibility');
     }
 
     initializeVoices() {
@@ -1262,12 +1351,17 @@ class Clara {
         }
     }
 
-    showError(message) {
+    showError(message, title = 'Error') {
         if (this.errorModal && this.errorMessage) {
-            this.errorMessage.textContent = message;
+            if (this.errorTitle) {
+                this.errorTitle.textContent = title;
+            }
+            // Replace \n with <br> for multi-line messages
+            const formattedMessage = message.replace(/\n/g, '<br>');
+            this.errorMessage.innerHTML = formattedMessage;
             this.errorModal.style.display = 'flex';
         } else {
-            alert(message);
+            alert(`${title}\n\n${message}`);
         }
     }
 
