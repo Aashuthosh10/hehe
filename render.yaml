@@ -15,11 +15,11 @@ services:
           name: clara-ai-reception
           property: port
       - key: GEMINI_API_KEY
-        sync: false
-      - key: MONGODB_URI
-        sync: false
+        value: AIzaSyBXJCu0WJJczcJs2jhLWk3IZMf2DsCtRg0
       - key: JWT_SECRET
-        sync: false
+        value: 2a9417187b5026ffffb08e1c6d1a6f9cb8981d1544ea4d4095bed9779f4f2a6c
       - key: JWT_EXPIRES_IN
         value: 24h
+      - key: MONGODB_URI
+        sync: false
 
