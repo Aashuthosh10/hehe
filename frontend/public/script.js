@@ -262,50 +262,172 @@ class Clara {
         const playButton = document.createElement('button');
         playButton.className = 'ios-play-audio-btn';
         playButton.innerHTML = '<i class="fas fa-volume-up"></i> Tap to hear';
+        
         playButton.onclick = (e) => {
             e.stopPropagation();
-            // iOS: Speech must be called directly from this user interaction
-            if (this.speechSynthesis && (text || this.lastBotResponse)) {
-                try {
-                    const textToSpeak = text || this.lastBotResponse;
-                    // Mark as interacted
-                    this.hasUserInteracted = true;
-                    
-                    // Cancel any existing speech
-                    this.speechSynthesis.cancel();
-                    
-                    // Create utterance
-                    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                    
-                    // Set voice properties
-                    const voices = this.availableVoices && this.availableVoices.length > 0
-                        ? this.availableVoices
-                        : (this.speechSynthesis.getVoices() || []);
-                    
-                    if (voices.length > 0) {
-                        const preferred = voices.find(v => /en(-|_)US/i.test(v.lang))
-                            || voices.find(v => /en(-|_)GB/i.test(v.lang))
-                            || voices.find(v => /en/i.test(v.lang))
-                            || voices[0];
-                        if (preferred) utterance.voice = preferred;
-                    }
-                    
-                    utterance.rate = 0.9;
-                    utterance.pitch = 1.0;
-                    utterance.volume = 0.85;
-                    utterance.lang = 'en-US';
-                    
-                    // Remove button immediately (before speaking)
-                    playButton.remove();
-                    
-                    // Speak directly from user interaction (synchronous)
-                    this.speechSynthesis.speak(utterance);
-                    
-                    console.log('iOS: Playing audio from user interaction');
-                } catch (error) {
-                    console.error('iOS: Failed to play audio:', error);
-                    this.showError('Unable to play audio. Please check your device volume and ensure it\'s not in silent mode.', 'Audio Error');
+            e.preventDefault();
+            
+            if (!this.speechSynthesis) {
+                console.error('iOS: speechSynthesis not available');
+                this.showError('Speech synthesis is not available in this browser.');
+                return;
+            }
+            
+            const textToSpeak = text || this.lastBotResponse;
+            if (!textToSpeak) {
+                console.error('iOS: No text to speak');
+                return;
+            }
+            
+            console.log('iOS: Button clicked, attempting to speak:', textToSpeak.substring(0, 50) + '...');
+            
+            // Mark as interacted
+            this.hasUserInteracted = true;
+            
+            // Cancel any existing speech first
+            try {
+                this.speechSynthesis.cancel();
+            } catch (e) {
+                console.warn('iOS: Failed to cancel:', e);
+            }
+            
+            // Ensure speechSynthesis is not paused (iOS requirement)
+            try {
+                if (this.speechSynthesis.paused) {
+                    this.speechSynthesis.resume();
                 }
+            } catch (e) {
+                console.warn('iOS: Resume check failed:', e);
+            }
+            
+            // Get voices - try multiple sources
+            let voices = [];
+            try {
+                voices = this.availableVoices && this.availableVoices.length > 0
+                    ? this.availableVoices
+                    : (this.speechSynthesis.getVoices() || []);
+            } catch (e) {
+                console.warn('iOS: Failed to get voices:', e);
+            }
+            
+            console.log('iOS: Available voices:', voices.length);
+            if (voices.length === 0) {
+                console.warn('iOS: No voices available - trying without voice selection');
+            }
+            
+            // Create utterance
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // iOS Safari is picky about voice selection - only set if we have valid voices
+            // Sometimes NOT setting a voice works better on iOS
+            if (voices.length > 0) {
+                // Prefer local voices (more reliable on iOS)
+                const preferred = voices.find(v => v.localService && /en/i.test(v.lang))
+                    || voices.find(v => /en(-|_)US/i.test(v.lang))
+                    || voices.find(v => /en(-|_)GB/i.test(v.lang))
+                    || voices.find(v => /en/i.test(v.lang))
+                    || voices[0];
+                
+                if (preferred) {
+                    utterance.voice = preferred;
+                    console.log('iOS: Using voice:', preferred.name, preferred.lang, 'localService:', preferred.localService);
+                }
+            }
+            
+            // iOS-compatible settings
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0; // Full volume - iOS respects this
+            utterance.lang = 'en-US';
+            
+            // Comprehensive error handling
+            let hasStarted = false;
+            let hasErrored = false;
+            
+            utterance.onstart = () => {
+                hasStarted = true;
+                console.log('iOS: ✅ Speech synthesis STARTED successfully');
+                playButton.innerHTML = '<i class="fas fa-volume-up"></i> Speaking...';
+                playButton.style.opacity = '0.7';
+            };
+            
+            utterance.onend = () => {
+                console.log('iOS: ✅ Speech synthesis COMPLETED');
+                setTimeout(() => {
+                    playButton.remove();
+                }, 500);
+            };
+            
+            utterance.onerror = (event) => {
+                hasErrored = true;
+                console.error('iOS: ❌ Speech synthesis ERROR:', event.error, event);
+                
+                // Show error feedback
+                playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+                playButton.style.background = '#ef4444';
+                
+                // Try to provide helpful error message
+                let errorMsg = 'Audio playback failed. ';
+                switch (event.error) {
+                    case 'not-allowed':
+                        errorMsg += 'Permission denied. Check Safari settings.';
+                        break;
+                    case 'audio-busy':
+                        errorMsg += 'Audio system busy. Try again.';
+                        break;
+                    case 'audio-hardware':
+                        errorMsg += 'Audio hardware issue. Check device volume.';
+                        break;
+                    case 'synthesis-failed':
+                        errorMsg += 'Synthesis failed. Your device may not support this.';
+                        break;
+                    default:
+                        errorMsg += `Error: ${event.error || 'Unknown'}. Check device volume and Safari settings.`;
+                }
+                
+                setTimeout(() => {
+                    this.showError(errorMsg);
+                    playButton.innerHTML = '<i class="fas fa-volume-up"></i> Tap to hear';
+                    playButton.style.background = '';
+                    playButton.style.opacity = '1';
+                }, 2000);
+            };
+            
+            utterance.onpause = () => {
+                console.log('iOS: Speech paused');
+            };
+            
+            utterance.onresume = () => {
+                console.log('iOS: Speech resumed');
+            };
+            
+            // Update button state
+            playButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+            playButton.disabled = true;
+            
+            try {
+                // CRITICAL: Call speak() synchronously from user interaction
+                this.speechSynthesis.speak(utterance);
+                console.log('iOS: speak() called successfully');
+                
+                // Verify it actually started (iOS quirk - sometimes speak() doesn't work)
+                setTimeout(() => {
+                    if (!hasStarted && !hasErrored) {
+                        console.warn('iOS: Speech did not start - possible iOS Safari bug');
+                        playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not supported';
+                        playButton.style.background = '#ffa500';
+                        playButton.disabled = false;
+                        
+                        this.showError('Speech synthesis may not be supported on this iOS version. Try updating Safari or using a different device.');
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                console.error('iOS: Exception in speak():', error);
+                this.showError('Failed to start speech: ' + error.message);
+                playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed';
+                playButton.style.background = '#ef4444';
+                playButton.disabled = false;
             }
         };
         
