@@ -196,13 +196,17 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/clara_db')
-.then(() => console.log('✅ Connected to MongoDB'))
-.catch(err => {
-  console.error('❌ MongoDB connection error:', err);
-  console.log('⚠️  Running in demo mode without database');
-});
+// MongoDB Connection - only connect if MongoDB URI is provided
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err);
+    console.log('⚠️  Running in demo mode without database');
+  });
+} else {
+  console.log('⚠️  MongoDB URI not provided - running in demo mode without database');
+}
 
 // Authentication middleware
 const authenticateToken = async (req, res, next) => {
