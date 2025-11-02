@@ -182,7 +182,7 @@ app.get('/api/staff/status/:staffId', (req, res) => {
 });
 
 // Static middleware - AFTER API routes
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Prevent favicon 404 noise
 app.get('/favicon.ico', (req, res) => res.status(204).end());
