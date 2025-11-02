@@ -182,7 +182,7 @@ app.get('/api/staff/status/:staffId', (req, res) => {
 });
 
 // Static middleware - AFTER API routes
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'frontend', 'public')));
 
 // Prevent favicon 404 noise
 app.get('/favicon.ico', (req, res) => res.status(204).end());
@@ -2069,7 +2069,7 @@ app.get('/api/staff/list', (req, res) => {
 
 // Root route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'index.html'));
 });
 
 // Staff interface routes
@@ -2079,32 +2079,32 @@ app.get('/staff', (req, res) => {
 });
 
 app.get('/staff-login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'staff-login.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'staff-login.html'));
 });
 
 app.get('/staff-dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'staff-neon.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'staff-neon.html'));
 });
 
 // Video call functionality is now integrated into main interfaces
 
 // Staff registration route
 app.get('/register', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'register.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'register.html'));
 });
 
 // College demo route
 app.get('/college-demo', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'college-demo.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'college-demo.html'));
 });
 
 // n8n test route
 app.get('/n8n-test', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'n8n-test.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'n8n-test.html'));
 });
 
 app.get('/test-routes', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'test-routes.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'public', 'test-routes.html'));
 });
 
 // Health check endpoint
