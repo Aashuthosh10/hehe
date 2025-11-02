@@ -24,6 +24,8 @@ class Clara {
 		this.availableVoices = [];
 		this.pendingSpeakQueue = [];
 		this.noSpeechRetries = 0;
+		// iOS audio fix - track user interaction
+		this.hasUserInteracted = false;
 		// Video call state
 		this.peerConnection = null;
 		this.localStream = null;
@@ -283,6 +285,27 @@ class Clara {
     }
 
     setupEventListeners() {
+        // Track user interaction for iOS audio - any click/touch enables audio
+        const enableAudioOnInteraction = () => {
+            if (!this.hasUserInteracted) {
+                this.hasUserInteracted = true;
+                console.log('User interaction detected - audio enabled for iOS');
+                // Process any queued speech
+                if (this.pendingSpeakQueue.length > 0 && this.isSpeechEnabled) {
+                    const queued = [...this.pendingSpeakQueue];
+                    this.pendingSpeakQueue = [];
+                    setTimeout(() => {
+                        queued.forEach(text => this.speak(text));
+                    }, 100);
+                }
+            }
+        };
+        
+        // Listen for any user interaction
+        document.addEventListener('click', enableAudioOnInteraction, { once: true });
+        document.addEventListener('touchstart', enableAudioOnInteraction, { once: true });
+        document.addEventListener('keydown', enableAudioOnInteraction, { once: true });
+        
         // Speech input button
         this.speechInputButton.addEventListener('click', () => {
             if (!this.isConversationStarted) {
@@ -1037,6 +1060,29 @@ class Clara {
 	speak(text) {
 		if (!this.speechSynthesis || !this.isSpeechEnabled || !text) return;
 		
+		// iOS Safari requires user interaction to start audio - check if we have that
+		if (this.browserInfo.isIOS) {
+			// On iOS, speech synthesis must be triggered by user interaction
+			// If we're not in a user interaction context, queue it
+			if (!this.hasUserInteracted) {
+				console.warn('iOS: Speech synthesis requires user interaction. Queuing speech...');
+				this.pendingSpeakQueue.push(text);
+				// Show a helpful indicator
+				if (this.speechStatusDisplay) {
+					this.speechStatusDisplay.textContent = 'Tap anywhere to enable audio responses';
+					this.speechStatusDisplay.style.color = '#ffa500';
+				}
+				return;
+			}
+			
+			// iOS: Ensure speechSynthesis is not paused
+			if (this.speechSynthesis.pending || this.speechSynthesis.speaking) {
+				// If already speaking, queue this
+				this.pendingSpeakQueue.push(text);
+				return;
+			}
+		}
+		
 		// Clean text for speech synthesis - remove emojis and special characters (if enabled)
 		let cleanedText = text;
 		if (this.isTextCleaningEnabled) {
@@ -1159,21 +1205,38 @@ class Clara {
 		};
 
 		try {
-			this.speechSynthesis.speak(utterance);
+			// iOS Safari fix: Ensure speech is called in the right context
+			if (this.browserInfo.isIOS) {
+				// On iOS, we must call speak directly - no setTimeout wrapping
+				// If we're here, we've already checked hasUserInteracted
+				this.speechSynthesis.speak(utterance);
+			} else {
+				this.speechSynthesis.speak(utterance);
+			}
 		} catch (error) {
 			console.error('Failed to start speech synthesis:', error);
 			
-			// Retry once after a short delay
-			setTimeout(() => {
-				try {
-					console.log('Retrying speech synthesis...');
-					this.speechSynthesis.speak(utterance);
-				} catch (retryError) {
-					console.error('Speech synthesis retry failed:', retryError);
-					// Clear queue and continue without speech
-					this.pendingSpeakQueue = [];
+			// iOS: Don't retry in setTimeout as it won't work
+			if (this.browserInfo.isIOS) {
+				console.warn('iOS: Speech synthesis failed. User interaction may be required.');
+				if (this.speechStatusDisplay) {
+					this.speechStatusDisplay.textContent = 'Tap the page to enable audio';
 				}
-			}, 500);
+				// Queue it for next user interaction
+				this.pendingSpeakQueue.unshift(cleanedText);
+			} else {
+				// Retry once after a short delay for non-iOS
+				setTimeout(() => {
+					try {
+						console.log('Retrying speech synthesis...');
+						this.speechSynthesis.speak(utterance);
+					} catch (retryError) {
+						console.error('Speech synthesis retry failed:', retryError);
+						// Clear queue and continue without speech
+						this.pendingSpeakQueue = [];
+					}
+				}, 500);
+			}
 		}
 	}
 
