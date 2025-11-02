@@ -264,7 +264,7 @@ class Clara {
         playButton.className = 'ios-play-audio-btn';
         playButton.innerHTML = '<i class="fas fa-volume-up"></i> Tap to hear';
         
-        playButton.onclick = (e) => {
+        playButton.onclick = async (e) => {
             e.stopPropagation();
             e.preventDefault();
             
@@ -427,46 +427,131 @@ class Clara {
                 console.log('iOS: Speech resumed');
             };
             
+            // Log complete state before speaking
+            console.log('iOS: 🔊 PRE-SPEAK DIAGNOSTICS:');
+            console.log('iOS: - speechSynthesis exists:', !!this.speechSynthesis);
+            console.log('iOS: - speechSynthesis.speaking:', this.speechSynthesis.speaking);
+            console.log('iOS: - speechSynthesis.pending:', this.speechSynthesis.pending);
+            console.log('iOS: - speechSynthesis.paused:', this.speechSynthesis.paused);
+            console.log('iOS: - Voices loaded:', voices.length);
+            console.log('iOS: - Text length:', textToSpeak.length);
+            console.log('iOS: - Utterance voice:', utterance.voice ? utterance.voice.name : 'default');
+            console.log('iOS: - Utterance settings:', {
+                rate: utterance.rate,
+                pitch: utterance.pitch,
+                volume: utterance.volume,
+                lang: utterance.lang
+            });
+            
             // Update button state
             playButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
             playButton.disabled = true;
             
             try {
+                // iOS Safari workaround: Sometimes need to cancel first, then wait a tiny bit
+                if (this.speechSynthesis.speaking || this.speechSynthesis.pending) {
+                    console.log('iOS: Canceling existing speech before starting new one');
+                    this.speechSynthesis.cancel();
+                    // Give iOS a moment to fully cancel
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
                 // CRITICAL: Call speak() synchronously from user interaction
+                console.log('iOS: 🎤 Calling speechSynthesis.speak() NOW...');
                 this.speechSynthesis.speak(utterance);
-                console.log('iOS: speak() called successfully');
+                console.log('iOS: ✅ speak() returned (no exception)');
+                
+                // Immediate state check (iOS Safari sometimes returns success but doesn't actually speak)
+                setTimeout(() => {
+                    const isActuallySpeaking = this.speechSynthesis.speaking || this.speechSynthesis.pending;
+                    console.log('iOS: Post-speak() state check (100ms):', {
+                        speaking: this.speechSynthesis.speaking,
+                        pending: this.speechSynthesis.pending,
+                        paused: this.speechSynthesis.paused,
+                        hasStarted: hasStarted,
+                        hasErrored: hasErrored,
+                        isActuallySpeaking: isActuallySpeaking
+                    });
+                    
+                    if (!isActuallySpeaking && !hasStarted && !hasErrored) {
+                        console.warn('iOS: ⚠️ speak() returned but speech did not start - iOS Safari silent failure');
+                    }
+                }, 100);
                 
                 // Verify it actually started (iOS quirk - sometimes speak() doesn't work)
                 setTimeout(() => {
                     if (!hasStarted && !hasErrored) {
-                        console.warn('iOS: ⚠️ Speech did not start after 1 second - possible iOS Safari bug');
-                        console.warn('iOS: speechSynthesis state:', {
+                        console.error('iOS: ❌ Speech did NOT start after 1 second - iOS Safari bug confirmed');
+                        console.error('iOS: Final speechSynthesis state:', {
                             speaking: this.speechSynthesis.speaking,
                             pending: this.speechSynthesis.pending,
                             paused: this.speechSynthesis.paused,
-                            voicesAvailable: this.speechSynthesis.getVoices()?.length || 0
+                            voicesAvailable: this.speechSynthesis.getVoices()?.length || 0,
+                            utteranceText: utterance.text?.substring(0, 50)
                         });
                         
-                        playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not supported';
-                        playButton.style.background = '#ffa500';
-                        playButton.disabled = false;
-                        
-                        const helpText = `Speech synthesis may not be supported on this iOS version.
+                        // Try iOS workaround: Cancel and retry once
+                        console.log('iOS: 🔄 Attempting iOS Safari workaround - retry with cancel/resume');
+                        try {
+                            this.speechSynthesis.cancel();
+                            this.speechSynthesis.resume();
+                            
+                            // Create new utterance (iOS sometimes needs fresh utterance)
+                            const retryUtterance = new SpeechSynthesisUtterance(textToSpeak);
+                            retryUtterance.rate = utterance.rate;
+                            retryUtterance.pitch = utterance.pitch;
+                            retryUtterance.volume = utterance.volume;
+                            retryUtterance.lang = utterance.lang;
+                            if (utterance.voice) retryUtterance.voice = utterance.voice;
+                            
+                            // Copy event handlers
+                            retryUtterance.onstart = utterance.onstart;
+                            retryUtterance.onend = utterance.onend;
+                            retryUtterance.onerror = utterance.onerror;
+                            
+                            this.speechSynthesis.speak(retryUtterance);
+                            console.log('iOS: Retry speak() called');
+                            
+                            // Check again after retry
+                            setTimeout(() => {
+                                if (!hasStarted && !hasErrored) {
+                                    playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not supported';
+                                    playButton.style.background = '#ffa500';
+                                    playButton.disabled = false;
+                                    
+                                    const helpText = `Speech synthesis is not working on this device.
+
+iOS Safari has a known bug where speech may fail silently.
 
 Troubleshooting:
 1. Check iOS version (iOS 14.5+ required)
-2. Update Safari to latest version
+2. Update Safari to latest version  
 3. Go to Settings → Safari → Clear Website Data
-4. Try a different device/browser
-5. Ensure device volume is up and not in silent mode`;
+4. Restart Safari completely
+5. Ensure device volume is UP and NOT in silent mode
+6. Try using Chrome from App Store instead`;
 
-                        this.showError(helpText);
-                        console.error('iOS: Speech synthesis not working - see error message above');
+                                    this.showError(helpText);
+                                    console.error('iOS: Speech synthesis failed after retry - device may not support it');
+                                }
+                            }, 1000);
+                        } catch (retryError) {
+                            console.error('iOS: Retry also failed:', retryError);
+                            playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Not supported';
+                            playButton.style.background = '#ffa500';
+                            playButton.disabled = false;
+                            this.showError('Speech synthesis is not supported on this iOS version or device.');
+                        }
                     }
                 }, 1000);
                 
             } catch (error) {
-                console.error('iOS: Exception in speak():', error);
+                console.error('iOS: ❌ Exception in speak():', error);
+                console.error('iOS: Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
                 this.showError('Failed to start speech: ' + error.message);
                 playButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed';
                 playButton.style.background = '#ef4444';
