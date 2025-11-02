@@ -9,6 +9,7 @@ const socketIo = require('socket.io');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 require('dotenv').config();
 
 // Import models
@@ -2062,6 +2063,11 @@ app.get('/api/staff/list', (req, res) => {
   }
 });
 
+// Root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Staff interface routes
 app.get('/staff', (req, res) => {
   // Redirect to the canonical staff login page to avoid confusion
@@ -2069,32 +2075,32 @@ app.get('/staff', (req, res) => {
 });
 
 app.get('/staff-login', (req, res) => {
-  res.sendFile(__dirname + '/public/staff-login.html');
+  res.sendFile(path.join(__dirname, 'public', 'staff-login.html'));
 });
 
 app.get('/staff-dashboard', (req, res) => {
-  res.sendFile(__dirname + '/public/staff-neon.html');
+  res.sendFile(path.join(__dirname, 'public', 'staff-neon.html'));
 });
 
 // Video call functionality is now integrated into main interfaces
 
 // Staff registration route
 app.get('/register', (req, res) => {
-  res.sendFile(__dirname + '/public/register.html');
+  res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
 // College demo route
 app.get('/college-demo', (req, res) => {
-  res.sendFile(__dirname + '/public/college-demo.html');
+  res.sendFile(path.join(__dirname, 'public', 'college-demo.html'));
 });
 
 // n8n test route
 app.get('/n8n-test', (req, res) => {
-  res.sendFile(__dirname + '/public/n8n-test.html');
+  res.sendFile(path.join(__dirname, 'public', 'n8n-test.html'));
 });
 
 app.get('/test-routes', (req, res) => {
-  res.sendFile(__dirname + '/public/test-routes.html');
+  res.sendFile(path.join(__dirname, 'public', 'test-routes.html'));
 });
 
 // Health check endpoint
@@ -2119,28 +2125,32 @@ app.get('/api/health', async (req, res) => {
   res.json(healthData);
 });
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚀 Clara AI Reception System running on port ${PORT}`);
-  console.log(`📱 Client Interface: http://localhost:${PORT}`);
-  console.log(`👥 Staff Login: http://localhost:${PORT}/staff-login`);
-  console.log(`📊 Staff Dashboard: http://localhost:${PORT}/staff-dashboard`);
-  console.log(`🎥 Video Call: Integrated into main interfaces`);
-  console.log(`🎓 College Demo: http://localhost:${PORT}/college-demo`);
-  console.log(`🔗 n8n Test Page: http://localhost:${PORT}/n8n-test`);
-  console.log(`🧪 Route Test Page: http://localhost:${PORT}/test-routes`);
-  console.log(`🔧 API health check: http://localhost:${PORT}/api/health`);
-  console.log(`🏫 College AI API: http://localhost:${PORT}/api/college/ask`);
-  console.log(`🔗 n8n Integration API: http://localhost:${PORT}/api/n8n`);
-  console.log(`🧪 n8n Test endpoint: http://localhost:${PORT}/api/n8n/test`);
-  
-  const GEMINI_KEY = process.env.GEMINI_API_KEY;
-  
-  if (GEMINI_KEY && GEMINI_KEY !== 'your_gemini_api_key_here') {
-    console.log(`🤖 Full AI mode enabled with Gemini AI`);
-  } else {
-    console.log(`⚠️  Note: Running in demo mode. Set GEMINI_API_KEY in .env for full AI functionality.`);
-  }
-});
+// Start server (only if not in serverless environment like Vercel)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`🚀 Clara AI Reception System running on port ${PORT}`);
+    console.log(`📱 Client Interface: http://localhost:${PORT}`);
+    console.log(`👥 Staff Login: http://localhost:${PORT}/staff-login`);
+    console.log(`📊 Staff Dashboard: http://localhost:${PORT}/staff-dashboard`);
+    console.log(`🎥 Video Call: Integrated into main interfaces`);
+    console.log(`🎓 College Demo: http://localhost:${PORT}/college-demo`);
+    console.log(`🔗 n8n Test Page: http://localhost:${PORT}/n8n-test`);
+    console.log(`🧪 Route Test Page: http://localhost:${PORT}/test-routes`);
+    console.log(`🔧 API health check: http://localhost:${PORT}/api/health`);
+    console.log(`🏫 College AI API: http://localhost:${PORT}/api/college/ask`);
+    console.log(`🔗 n8n Integration API: http://localhost:${PORT}/api/n8n`);
+    console.log(`🧪 n8n Test endpoint: http://localhost:${PORT}/api/n8n/test`);
+    
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    
+    if (GEMINI_KEY && GEMINI_KEY !== 'your_gemini_api_key_here') {
+      console.log(`🤖 Full AI mode enabled with Gemini AI`);
+    } else {
+      console.log(`⚠️  Note: Running in demo mode. Set GEMINI_API_KEY in .env for full AI functionality.`);
+    }
+  });
+}
 
+// Export both app and server for Vercel
 module.exports = app;
+module.exports.server = server;
